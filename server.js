@@ -30,7 +30,7 @@ app.get('/api/socios', (req, res) => {
           socios.apellido,
           socios.telefono,
           socios.domicilio,
-          socios.numero_familiares,
+          socios.invitaciones,
           tarjetas.numero_tarjeta
         FROM
           socios
@@ -71,7 +71,7 @@ app.get('/api/socios/:id', (req, res) => {
           socios.apellido,
           socios.telefono,
           socios.domicilio,
-          socios.numero_familiares,
+          socios.invitaciones,
           tarjetas.numero_tarjeta
         FROM
           socios
@@ -112,7 +112,7 @@ app.get('/api/familiares/:id', (req, res) => {
       console.log('Conectado a la base de datos');
       const query = `
         SELECT
-          familiares.id_familiar,
+        familiares.id_familiar,
           familiares.nombre,
           familiares.apellido
         FROM
@@ -141,6 +141,21 @@ app.get('/api/familiares/:id', (req, res) => {
       res.status(500).json({ error: 'Error de conexión a la base de datos' });
     });
 });
+
+app.delete('/api/familiares/:id', (req, res) => {
+  const idFamiliar = req.params.id;
+  const query = 'DELETE FROM familiares WHERE id_familiar = ?';
+
+  db.query(query, [idFamiliar], (error, results) => {
+    if (error) {
+      console.error(error);
+      res.status(500).send('Error al eliminar el familiar.');
+    } else {
+      res.send('Familiar eliminado correctamente.');
+    }
+  });
+});
+
 
 // Iniciar el servidor
 app.listen(3000, () => {
