@@ -4,6 +4,11 @@ const cors = require('cors'); // Importar cors
 
 const app = express();
 
+// Middleware para permitir el parseo de solicitudes JSON
+app.use(cors());
+app.use(express.json()); // Este middleware es crucial para procesar req.body como JSON
+app.use(express.urlencoded({ extended: true })); // Para procesar datos de formularios si es necesario
+
 // Usar CORS en el servidor
 app.use(cors()); // Esto habilita CORS para todas las solicitudes
 
@@ -135,8 +140,6 @@ app.get('/api/entrada/:numTar', (req, res) => {
     });
 });
 
-
-
 // Ruta para obtener un socio por su ID
 app.get('/api/socios/:id', (req, res) => {
   const socioId = req.params.id;
@@ -151,13 +154,9 @@ app.get('/api/socios/:id', (req, res) => {
           socios.telefono,
           socios.domicilio,
           socios.invitaciones,
-          tarjetas.numero_tarjeta
+          socios.NumTar
         FROM
           socios
-        JOIN
-          tarjetas
-        ON
-          socios.id_socio = tarjetas.id_socio
         WHERE
           socios.id_socio = ?;
       `;
@@ -235,7 +234,81 @@ app.delete('/api/familiares/:id', (req, res) => {
   });
 });
 
+// Ruta para agregar un socio
+app.post('/api/socios', (req, res) => {
+  console.log('Body recibido:', req.body); // Agrega esta línea
+  const { nombre, apellido, telefono, domicilio, invitaciones, NumTar } = req.body;
 
+  pool.getConnection()
+    .then(conn => {
+      const query = `
+        INSERT INTO socios (nombre, apellido, telefono, domicilio, invitaciones, NumTar)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `;
+      conn.query(query, [nombre, apellido, telefono, domicilio, invitaciones, NumTar])
+  .then(result => {
+    // Convertir insertId a String para evitar el error de BigInt
+    const insertId = result.insertId.toString(); // o puedes usar .valueOf() para convertirlo a Number
+
+    res.status(201).json({ message: 'Socio agregado correctamente', id: insertId });
+        })
+    })
+    .catch(err => {
+      console.error('Error de conexión:', err);
+      res.status(500).json({ error: 'Error de conexión a la base de datos' });
+    });
+});
+
+// Ruta para agregar un familiar
+app.post('/api/familiares', (req, res) => {
+  const { idSocio, nombre, apellido } = req.body;
+
+  pool.getConnection()
+    .then(conn => {
+      // Obtener el número de tarjeta del socio
+      const getNumTarQuery = `SELECT NumTar FROM socios WHERE id_socio = ?`;
+
+      conn.query(getNumTarQuery, [idSocio])
+        .then(rows => {
+          if (rows.length === 0) {
+            res.status(404).json({ error: 'Socio no encontrado' });
+            return Promise.reject('Socio no encontrado');
+          }
+
+          const numTarBase = rows[0].NumTar;
+
+          // Obtener el número de familiares existentes para generar el sufijo
+          const countFamiliaresQuery = `SELECT COUNT(*) AS total FROM familiares WHERE id_socio = ?`;
+
+          return conn.query(countFamiliaresQuery, [idSocio])
+            .then(countRows => {
+              const totalFamiliares = countRows[0].total;
+              const numTarFamiliar = `${numTarBase}${String(totalFamiliares + 1).padStart(2, '0')}`;
+
+              // Insertar el nuevo familiar
+              const insertFamiliarQuery = `
+                INSERT INTO familiares (id_familiar, id_socio, nombre, apellido, NumTar)
+                VALUES (?, ?, ?, ?, ?)
+              `;
+              return conn.query(insertFamiliarQuery, [idSocio, nombre, apellido, numTarFamiliar]);
+            });
+        })
+        .then(result => {
+          res.status(201).json({ message: 'Familiar agregado correctamente', id: result.insertId });
+        })
+        .catch(err => {
+          if (err !== 'Socio no encontrado') {
+            console.error('Error al agregar el familiar:', err);
+            res.status(500).json({ error: 'Error al agregar el familiar' });
+          }
+        })
+        .finally(() => conn.end());
+    })
+    .catch(err => {
+      console.error('Error de conexión:', err);
+      res.status(500).json({ error: 'Error de conexión a la base de datos' });
+    });
+});
 
 // Iniciar el servidor
 app.listen(3000, () => {
