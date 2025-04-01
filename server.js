@@ -508,7 +508,7 @@ app.get('/api/aforo', (req, res) => {
       let nhoras = dfechahoy.getHours();
       let cmes, nmes, canio, cdia;
 
-      if (nhoras > 0 && nhoras < 10) {
+      if (nhoras >= 0 && nhoras < 10) {
         dfechainicio.setDate(dfechahoy.getDate() - 1);
         dfechafinal.setDate(dfechafinal.getDate());
       } else {
@@ -546,16 +546,25 @@ app.get('/api/aforo', (req, res) => {
 
           // esta condicion funciona
           if (horaLimpieza) {
-            cFecha = `((fecha = '${cfechainicio}' AND hora >= '${horaLimpieza}')
-                        OR (fecha = '${cfechainicio}' AND hora > '${horaLimpieza}')
+
+            if(horaLimpieza >= '10:00:00' &&  horaLimpieza <= '23:59:59' ) {
+              cFecha = `((fecha = '${cfechainicio}'  AND hora >= '${horaLimpieza}')
                         OR (fecha = '${cfechafinal}' AND hora < '10:00:00'))`;
+
+            }else {
+              cFecha = `fecha = '${cfechafinal}' AND hora < '10:00:00' AND hora >= '${horaLimpieza}'`;
+            }
+
           } else {
             cFecha = `((fecha = '${cfechainicio}' AND hora >= '10:00:00')
                         OR (fecha = '${cfechafinal}' AND hora < '10:00:00'))`;
           }
 
+
+
           cSentencia = `SELECT * FROM movimientos WHERE ${cFecha} ORDER BY fecha ASC, hora ASC`;
           console.log('sentencia: ' + cSentencia);
+
           return conn.query(cSentencia);
         })
         .then(rows => {
@@ -601,6 +610,7 @@ app.get('/api/movimientosFam/:idsocio', (req, res) => {
         dfechainicio.setDate(dfechahoy.getDate());
         dfechafinal.setDate(dfechafinal.getDate() + 1);
       }
+
 
       nmes = dfechainicio.getMonth() + 1;
       cmes = ('0' + nmes).slice(-2);
